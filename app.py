@@ -5,7 +5,7 @@ import urllib.parse
 import random
 
 # --- 1. CONFIGURAÇÃO DE ALTA PERFORMANCE ---
-st.set_page_config(page_title="GameVault Pro | Reviews", layout="wide", page_icon="🎮")
+st.set_page_config(page_title="GameVault Pro | Steam Reviews", layout="wide", page_icon="🎮")
 
 @st.cache_data(ttl=3600)
 def get_auth():
@@ -27,21 +27,36 @@ def traduzir_resumo(texto):
     except:
         return texto
 
-# --- NOVO: GERADOR DE CRÍTICAS PARA PREENCHER O VAZIO ---
-def exibir_criticas_fake(nota):
-    criticas = [
-        {"nome": "IGN Tech", "txt": "Uma obra-prima técnica que redefine o gênero.", "img": "https://i.pravatar.cc/150?u=ign"},
-        {"nome": "GameSpot", "txt": "Visual deslumbrante e jogabilidade viciante.", "img": "https://i.pravatar.cc/150?u=gs"},
-        {"nome": "PC Gamer", "txt": "A performance é sólida e a imersão é absoluta.", "img": "https://i.pravatar.cc/150?u=pcg"}
-    ]
-    st.markdown("### 💬 AVALIAÇÕES DA CRÍTICA")
-    for c in criticas:
-        col_v1, col_v2 = st.columns([1, 5])
-        with col_v1:
-            st.image(c['img'], width=50)
-        with col_v2:
-            st.markdown(f"**{c['nome']}**: *\"{c['txt']}\"*")
-        st.markdown("<br>", unsafe_allow_html=True)
+# --- NOVO: BUSCA DE COMENTÁRIOS REAIS DA STEAM ---
+def exibir_comentarios_steam(nome_jogo):
+    st.markdown("### 🗣️ O QUE DIZEM OS JOGADORES NA STEAM")
+    try:
+        # 1. Busca o AppID na Steam pelo nome
+        search_url = f"https://store.steampowered.com/api/storesearch/?term={urllib.parse.quote(nome_jogo)}&l=brazilian&cc=BR"
+        res_search = requests.get(search_url).json()
+        
+        if res_search.get('total') > 0:
+            appid = res_search['items'][0]['id']
+            # 2. Busca as reviews reais usando o AppID
+            reviews_url = f"https://store.steampowered.com/appreviews/{appid}?json=1&language=brazilian&filter=summary&num_per_page=3"
+            res_reviews = requests.get(reviews_url).json()
+            
+            if res_reviews.get('reviews'):
+                for rev in res_reviews['reviews']:
+                    col_icon, col_txt = st.columns([1, 10])
+                    with col_icon:
+                        st.write("👍" if rev['voted_up'] else "👎")
+                    with col_txt:
+                        # Limita o tamanho do comentário para não quebrar o layout
+                        texto_review = rev['review'][:300] + "..." if len(rev['review']) > 300 else rev['review']
+                        st.markdown(f"*{texto_review}*")
+                    st.markdown("---")
+            else:
+                st.info("Ainda não há comentários brasileiros para este título na Steam.")
+        else:
+            st.warning("Jogo não localizado na base de dados da Steam.")
+    except:
+        st.error("Erro ao conectar com os servidores da Steam.")
 
 # --- 2. DESIGN SYSTEM ---
 st.markdown("""
@@ -76,7 +91,7 @@ else:
 
 jogos = query_igdb("games", q)
 
-# --- 4. MODAL COM SEÇÃO DE CRÍTICAS ADICIONADA ---
+# --- 4. MODAL COM COMENTÁRIOS DA STEAM ---
 @st.dialog("DOSSIÊ DO JOGO", width="large")
 def modal_detalhes(g):
     nome = g.get('name')
@@ -103,8 +118,8 @@ def modal_detalhes(g):
         st.write(f"📅 **LANÇAMENTO:** {datetime.fromtimestamp(g.get('first_release_date', 0)).strftime('%d/%m/%Y') if g.get('first_release_date') else 'TBA'}")
         
         st.divider()
-        # AQUI PREENCHEMOS O VAZIO DA SUA IMAGEM
-        exibir_criticas_fake(g.get('rating', 0))
+        # SUBSTITUÍDO: Agora exibe comentários REAIS da Steam
+        exibir_comentarios_steam(nome)
 
     if 'screenshots' in g:
         st.divider()
