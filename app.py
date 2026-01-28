@@ -3,112 +3,158 @@ import requests
 from datetime import datetime
 import urllib.parse
 
-# --- 1. CONFIGURAÇÃO E CACHE DE ALTA VELOCIDADE ---
-st.set_page_config(page_title="GameVault Ultra-Fast", layout="wide", page_icon="⚡")
+# --- 1. CONFIGURAÇÃO DE ALTA PERFORMANCE ---
+st.set_page_config(page_title="GameVault Pro | Critical Review", layout="wide", page_icon="🎮")
 
-# Cache de Token para não pedir autorização toda hora
 @st.cache_data(ttl=3600)
 def get_auth():
     r = requests.post(f"https://id.twitch.tv/oauth2/token?client_id=eakvrhyzodw5xcr7e2q6gsz94ybiap&client_secret=fsrgfhqs98tpxfantkwhde786paxls&grant_type=client_credentials")
     return r.json().get('access_token')
 
-# Função de consulta otimizada
 def query_igdb(endpoint, query):
     token = get_auth()
     headers = {'Client-ID': 'eakvrhyzodw5xcr7e2q6gsz94ybiap', 'Authorization': f'Bearer {token}'}
     r = requests.post(f"https://api.igdb.com/v4/{endpoint}", headers=headers, data=query)
     return r.json() if r.status_code == 200 else []
 
-# --- 2. ESTILO CSS (Otimizado para não pesar no render) ---
+# --- 2. DESIGN SYSTEM (PROFISSIONAL ABSURDO) ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Inter:wght@400;700&display=swap');
-    .stApp { background: #050505; color: #eee; font-family: 'Inter', sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Plus+Jakarta+Sans:wght@300;400;700&display=swap');
+    
+    .stApp { background: #020205; color: #f8f9fa; font-family: 'Plus Jakarta Sans', sans-serif; }
+    
+    /* Grid de Jogos */
     .game-card {
-        background: #111; border: 1px solid #222; border-radius: 12px;
-        padding: 10px; transition: 0.2s ease-in-out; text-align: center;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 15px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-align: center;
+        backdrop-filter: blur(10px);
     }
-    .game-card:hover { border-color: #00f2ff; transform: scale(1.02); }
-    /* Efeito de carregamento suave */
-    .stImage img { animation: fadeIn 0.5s; border-radius: 8px; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .game-card:hover {
+        transform: translateY(-8px);
+        border-color: #00f2ff;
+        background: rgba(0, 242, 255, 0.05);
+        box-shadow: 0 10px 30px rgba(0, 242, 255, 0.2);
+    }
+
+    /* Crítica e Notas */
+    .score-box {
+        background: linear-gradient(135deg, #00f2ff, #7000ff);
+        padding: 5px 12px;
+        border-radius: 8px;
+        font-weight: 800;
+        font-family: 'Orbitron';
+        font-size: 1.1rem;
+        color: white;
+    }
+    
+    .company-tag {
+        color: #00f2ff;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. LOGICA DE VELOCIDADE (CARREGAMENTO EM BLOCO) ---
+# --- 3. LÓGICA DE DADOS (CRÍTICA E EMPRESAS) ---
 if 'pg' not in st.session_state: st.session_state.pg = 0
 
 with st.sidebar:
-    st.title("⚡ Ultra-Fast")
-    busca = st.text_input("Busca Instantânea")
+    st.title("🌌 GameVault Pro")
+    st.markdown("---")
+    busca = st.text_input("🔍 PESQUISAR NA DATABASE")
+    ordem = st.selectbox("FILTRAR POR", ["Mais Populares", "Melhor Crítica", "Novidades"])
 
-# Puxamos TUDO o que precisamos de uma vez (Summary, Screenshots, Websites) 
-# para que o modal não precise de uma nova consulta à internet.
+# Query Avançada (Puxando Crítica, Usuários e Empresas)
 off = st.session_state.pg * 12
-campos_completos = "fields name, summary, rating, first_release_date, cover.url, screenshots.url, websites.url, websites.category;"
+campos = """
+    fields name, summary, rating, aggregated_rating, aggregated_rating_count, 
+    first_release_date, cover.url, screenshots.url, websites.url, websites.category, 
+    genres.name, involved_companies.company.name, involved_companies.developer;
+"""
 
 if busca:
-    q = f'search "{busca}"; {campos_completos} limit 12;'
+    q = f'search "{busca}"; {campos} limit 12;'
 else:
-    q = f"{campos_completos} where rating_count > 10; sort rating desc; limit 12; offset {off};"
+    sort_q = "rating desc" if ordem == "Melhor Crítica" else "first_release_date desc"
+    q = f"{campos} where rating_count > 15; sort {sort_q}; limit 12; offset {off};"
 
-# Esta é a única chamada de rede que o app fará por página
 jogos = query_igdb("games", q)
 
-# --- 4. MODAL INSTANTÂNEO (SEM CONSULTA DE REDE) ---
-@st.dialog("INFO TÉCNICA", width="large")
+# --- 4. MODAL DE FICHA TÉCNICA PROFISSIONAL ---
+@st.dialog("DOSSIÊ DO JOGO", width="large")
 def modal_detalhes(g):
     nome = g.get('name')
-    st.header(f"🚀 {nome}")
+    st.title(f"👾 {nome}")
     
-    c1, c2 = st.columns([1, 1.5])
+    c1, c2 = st.columns([1.2, 2])
+    
     with c1:
-        # Usamos a URL que já veio na busca inicial
         img = "https:" + g['cover']['url'].replace('t_thumb', 't_720p') if 'cover' in g else ""
         st.image(img, use_container_width=True)
-        search_query = urllib.parse.quote(nome)
-        st.link_button("📊 TECHNICAL CITY (BENCHMARK)", f"https://technical.city/pt/can-i-run-it?game={search_query}", use_container_width=True)
+        
+        # Bloco de Notas (Crítica vs Usuários)
+        st.markdown("### 📊 AVALIAÇÕES")
+        nota_user = round(g.get('rating', 0), 1)
+        nota_critica = round(g.get('aggregated_rating', 0), 1)
+        
+        col_n1, col_n2 = st.columns(2)
+        col_n1.metric("PÚBLICO", f"{nota_user}%")
+        col_n2.metric("CRÍTICA", f"{nota_critica}%" if nota_critica > 0 else "N/A")
+        
+        st.markdown("---")
+        st.link_button("📊 ANALISAR HARDWARE (Technical.City)", f"https://technical.city/pt/can-i-run-it?game={urllib.parse.quote(nome)}", use_container_width=True)
 
     with c2:
-        st.write(f"⭐ **NOTA:** {int(g.get('rating', 0))}/100")
-        st.write(g.get('summary', 'Sem descrição.'))
+        # Desenvolvedoras
+        empresas = [comp['company']['name'] for comp in g.get('involved_companies', []) if comp.get('developer')]
+        st.markdown(f"<div class='company-tag'>DESENVOLVIDO POR: {', '.join(empresas) if empresas else 'Estúdio Independente'}</div>", unsafe_allow_html=True)
         
-        st.markdown("### 🛒 LINKS")
-        sites = g.get('websites', [])
-        if sites:
-            cols = st.columns(2)
-            for i, s in enumerate(sites[:4]):
-                with cols[i%2]:
-                    st.link_button(f"Link {i+1}", s.get('url'), use_container_width=True)
+        st.write(f"📅 **DATA DE LANÇAMENTO:** {datetime.fromtimestamp(g.get('first_release_date', 0)).strftime('%d/%m/%Y') if g.get('first_release_date') else 'TBA'}")
+        st.markdown(f"**RESUMO PROFISSIONAL:**\n{g.get('summary', 'Descrição técnica não disponível.')}")
+        
+        # Galeria de Screenshots (Todas as fotos)
+        if 'screenshots' in g:
+            st.markdown("### 📸 GALERIA 4K")
+            fotos = ["https:" + s['url'].replace('t_thumb', 't_720p') for s in g['screenshots']]
+            st.image(fotos, use_container_width=True)
 
-    if 'screenshots' in g:
-        st.divider()
-        imgs = ["https:" + s['url'].replace('t_thumb', 't_med') for s in g['screenshots'][:3]]
-        st.image(imgs, use_container_width=True)
-
-# --- 5. GRID ---
+# --- 5. RENDERIZAÇÃO DO GRID ---
 if jogos:
     cols = st.columns(4)
     for i, j in enumerate(jogos):
         with cols[i % 4]:
             st.markdown('<div class="game-card">', unsafe_allow_html=True)
-            # Capa otimizada (t_cover_big é mais leve que t_720p)
+            
+            # Nota do Card
+            nota_exibida = int(j.get('rating', 0))
+            st.markdown(f"<div style='display: flex; justify-content: flex-end;'><span class='score-box'>{nota_exibida}</span></div>", unsafe_allow_html=True)
+            
             capa = "https:" + j.get('cover', {}).get('url', '').replace('t_thumb', 't_cover_big') if j.get('cover') else "https://via.placeholder.com/264x352"
             st.image(capa, use_container_width=True)
-            st.markdown(f"**{j.get('name')}**")
             
-            # O SEGREDO: Passamos o dicionário 'j' inteiro para a função
-            # assim o modal abre na hora porque já tem os dados na memória!
-            if st.button("ANALISAR", key=f"id_{j['id']}", use_container_width=True):
+            # Info da Empresa no Card
+            emp = [comp['company']['name'] for comp in j.get('involved_companies', []) if comp.get('developer')]
+            st.markdown(f"<div class='company-tag'>{emp[0] if emp else 'Indie'}</div>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:1.1rem; font-weight:700; min-height:60px;'>{j.get('name')}</p>", unsafe_allow_html=True)
+            
+            if st.button("ANALISAR DOSSIÊ", key=f"id_{j['id']}", use_container_width=True):
                 modal_detalhes(j)
             st.markdown('</div>', unsafe_allow_html=True)
 
     # Navegação
-    st.markdown("---")
-    b1, b2, b3 = st.columns([1,1,1])
-    if b1.button("⬅️ VOLTAR") and st.session_state.pg > 0:
+    st.markdown("<br>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1,1,1])
+    if c1.button("⬅️ VOLTAR") and st.session_state.pg > 0:
         st.session_state.pg -= 1
         st.rerun()
-    if b3.button("MAIS ➡️"):
+    if c3.button("PRÓXIMA PÁGINA ➡️"):
         st.session_state.pg += 1
         st.rerun()
