@@ -1,0 +1,6 @@
+body { background: linear-gradient(to bottom, #ff69b4, #ffffff); font-family: 'Cursive', sans-serif; }  /* Tons rosa hot */
+.hot-card { border-radius: 15px; overflow: hidden; transition: transform 0.3s, box-shadow 0.3s; }
+.hot-card:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(255, 0, 0, 0.5); }  /* Glow sexy */
+.blurred { filter: blur(5px); }  /* Tease no preview */
+.buy-btn { background: #ff0000; border: none; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }  /* Pulsar dopaminérgico */

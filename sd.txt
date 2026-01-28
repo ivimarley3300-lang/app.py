@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <title>Hot Videos - Maria Helena</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/confetti-js@0.0.18/dist/index.min.js"></script>
+</head>
+<body>
+    <header class="bg-primary text-white text-center py-4">
+        <h1>Maria Helena's Hot Content</h1>
+        <p>Conteúdo exclusivo e hot! Assine ou compre individualmente.</p>  <!-- Simula perfil OnlyFans -->
+    </header>
+    <div class="container my-5">
+        <div class="row">
+            {% for key, video in videos.items() %}
+            <div class="col-md-3">
+                <div class="card hot-card">
+                    <img src="{{ video.preview }}" class="card-img-top blurred" alt="Preview">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ video.title }}</h5>
+                        <p class="card-text">R$ 20,00</p>
+                        <form method="POST" action="{{ url_for('buy', category=key) }}">
+                            <button type="submit" class="btn btn-danger buy-btn">Comprar Agora</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
