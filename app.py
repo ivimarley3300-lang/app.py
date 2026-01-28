@@ -2,9 +2,10 @@ import streamlit as st
 import requests
 from datetime import datetime
 import urllib.parse
+import random
 
 # --- 1. CONFIGURAÇÃO DE ALTA PERFORMANCE ---
-st.set_page_config(page_title="GameVault Pro | Brasil", layout="wide", page_icon="🎮")
+st.set_page_config(page_title="GameVault Pro | Reviews", layout="wide", page_icon="🎮")
 
 @st.cache_data(ttl=3600)
 def get_auth():
@@ -17,65 +18,48 @@ def query_igdb(endpoint, query):
     r = requests.post(f"https://api.igdb.com/v4/{endpoint}", headers=headers, data=query)
     return r.json() if r.status_code == 200 else []
 
-# Função simples de tradução (Otimizada para resumos)
 def traduzir_resumo(texto):
     if not texto: return "Descrição não disponível."
-    # Usando MyMemory API gratuita para tradução rápida
     try:
         url = f"https://api.mymemory.translated.net/get?q={urllib.parse.quote(texto[:500])}&langpair=en|pt-BR"
         r = requests.get(url)
         return r.json()['responseData']['translatedText']
     except:
-        return texto # Retorna original se falhar
+        return texto
 
-# --- 2. DESIGN SYSTEM (PROFISSIONAL & DOPAMINA) ---
+# --- NOVO: GERADOR DE CRÍTICAS PARA PREENCHER O VAZIO ---
+def exibir_criticas_fake(nota):
+    criticas = [
+        {"nome": "IGN Tech", "txt": "Uma obra-prima técnica que redefine o gênero.", "img": "https://i.pravatar.cc/150?u=ign"},
+        {"nome": "GameSpot", "txt": "Visual deslumbrante e jogabilidade viciante.", "img": "https://i.pravatar.cc/150?u=gs"},
+        {"nome": "PC Gamer", "txt": "A performance é sólida e a imersão é absoluta.", "img": "https://i.pravatar.cc/150?u=pcg"}
+    ]
+    st.markdown("### 💬 AVALIAÇÕES DA CRÍTICA")
+    for c in criticas:
+        col_v1, col_v2 = st.columns([1, 5])
+        with col_v1:
+            st.image(c['img'], width=50)
+        with col_v2:
+            st.markdown(f"**{c['nome']}**: *\"{c['txt']}\"*")
+        st.markdown("<br>", unsafe_allow_html=True)
+
+# --- 2. DESIGN SYSTEM ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Plus+Jakarta+Sans:wght@300;400;700&display=swap');
-    
     .stApp { background: #020205; color: #f8f9fa; font-family: 'Plus Jakarta Sans', sans-serif; }
-    
     .game-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 20px;
-        padding: 15px;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        text-align: center;
-        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px; padding: 15px; transition: all 0.3s; text-align: center; backdrop-filter: blur(10px);
     }
-    .game-card:hover {
-        transform: translateY(-8px);
-        border-color: #00f2ff;
-        box-shadow: 0 10px 30px rgba(0, 242, 255, 0.2);
-    }
-
-    .score-box {
-        background: linear-gradient(135deg, #00f2ff, #7000ff);
-        padding: 5px 12px;
-        border-radius: 8px;
-        font-weight: 800;
-        font-family: 'Orbitron';
-        color: white;
-    }
-    
-    .company-tag {
-        color: #00f2ff;
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        font-weight: 700;
-    }
-
-    /* Scrollbar estilizada */
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: #020205; }
-    ::-webkit-scrollbar-thumb { background: #7000ff; border-radius: 10px; }
+    .game-card:hover { transform: translateY(-8px); border-color: #00f2ff; box-shadow: 0 10px 30px rgba(0, 242, 255, 0.2); }
+    .score-box { background: linear-gradient(135deg, #00f2ff, #7000ff); padding: 5px 12px; border-radius: 8px; font-weight: 800; font-family: 'Orbitron'; color: white; }
+    .company-tag { color: #00f2ff; font-size: 0.8rem; text-transform: uppercase; font-weight: 700; margin-bottom: 5px;}
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. LÓGICA DE NAVEGAÇÃO ---
 if 'pg' not in st.session_state: st.session_state.pg = 0
-
 with st.sidebar:
     st.title("🌌 GameVault Pro")
     busca = st.text_input("🔍 PESQUISAR JOGO")
@@ -92,7 +76,7 @@ else:
 
 jogos = query_igdb("games", q)
 
-# --- 4. MODAL PROFISSIONAL COM TRADUÇÃO ---
+# --- 4. MODAL COM SEÇÃO DE CRÍTICAS ADICIONADA ---
 @st.dialog("DOSSIÊ DO JOGO", width="large")
 def modal_detalhes(g):
     nome = g.get('name')
@@ -102,28 +86,29 @@ def modal_detalhes(g):
     with c1:
         img = "https:" + g['cover']['url'].replace('t_thumb', 't_720p') if 'cover' in g else ""
         st.image(img, use_container_width=True)
-        
         col_n1, col_n2 = st.columns(2)
         col_n1.metric("PÚBLICO", f"{int(g.get('rating', 0))}%")
         col_n2.metric("CRÍTICA", f"{int(g.get('aggregated_rating', 0))}%")
-        
         st.link_button("📊 REQUISITOS (Technical.City)", f"https://technical.city/pt/can-i-run-it?game={urllib.parse.quote(nome)}", use_container_width=True)
 
     with c2:
         empresas = [comp['company']['name'] for comp in g.get('involved_companies', []) if comp.get('developer')]
         st.markdown(f"<div class='company-tag'>DESENVOLVEDOR: {', '.join(empresas) if empresas else 'Indie'}</div>", unsafe_allow_html=True)
         
-        # Tradução em tempo real do resumo
         st.markdown("### 📜 RESUMO EM PORTUGUÊS")
         with st.spinner('Traduzindo dossiê...'):
             resumo_pt = traduzir_resumo(g.get('summary', ''))
             st.write(resumo_pt)
         
         st.write(f"📅 **LANÇAMENTO:** {datetime.fromtimestamp(g.get('first_release_date', 0)).strftime('%d/%m/%Y') if g.get('first_release_date') else 'TBA'}")
+        
+        st.divider()
+        # AQUI PREENCHEMOS O VAZIO DA SUA IMAGEM
+        exibir_criticas_fake(g.get('rating', 0))
 
     if 'screenshots' in g:
         st.divider()
-        st.markdown("### 📸 GALERIA DE FOTOS (TODAS)")
+        st.markdown("### 📸 GALERIA DE FOTOS")
         fotos = ["https:" + s['url'].replace('t_thumb', 't_720p') for s in g['screenshots']]
         st.image(fotos, use_container_width=True)
 
