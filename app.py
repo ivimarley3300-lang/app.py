@@ -1,151 +1,98 @@
 import streamlit as st
-import requests
-from datetime import datetime
-import urllib.parse
-import random
+import os
 
-# --- 1. CONFIGURAÇÃO DE ALTA PERFORMANCE ---
-st.set_page_config(page_title="GameVault Pro | Steam Reviews", layout="wide", page_icon="🎮")
+# --- 1. CONFIGURAÇÃO DE ESTILO VIP ---
+st.set_page_config(page_title="Heleninha videos - Exclusive", layout="wide", page_icon="🔥")
 
-@st.cache_data(ttl=3600)
-def get_auth():
-    r = requests.post(f"https://id.twitch.tv/oauth2/token?client_id=eakvrhyzodw5xcr7e2q6gsz94ybiap&client_secret=fsrgfhqs98tpxfantkwhde786paxls&grant_type=client_credentials")
-    return r.json().get('access_token')
-
-def query_igdb(endpoint, query):
-    token = get_auth()
-    headers = {'Client-ID': 'eakvrhyzodw5xcr7e2q6gsz94ybiap', 'Authorization': f'Bearer {token}'}
-    r = requests.post(f"https://api.igdb.com/v4/{endpoint}", headers=headers, data=query)
-    return r.json() if r.status_code == 200 else []
-
-def traduzir_resumo(texto):
-    if not texto: return "Descrição não disponível."
-    try:
-        url = f"https://api.mymemory.translated.net/get?q={urllib.parse.quote(texto[:500])}&langpair=en|pt-BR"
-        r = requests.get(url)
-        return r.json()['responseData']['translatedText']
-    except:
-        return texto
-
-# --- NOVO: BUSCA DE COMENTÁRIOS REAIS DA STEAM ---
-def exibir_comentarios_steam(nome_jogo):
-    st.markdown("### 🗣️ O QUE DIZEM OS JOGADORES NA STEAM")
-    try:
-        # 1. Busca o AppID na Steam pelo nome
-        search_url = f"https://store.steampowered.com/api/storesearch/?term={urllib.parse.quote(nome_jogo)}&l=brazilian&cc=BR"
-        res_search = requests.get(search_url).json()
-        
-        if res_search.get('total') > 0:
-            appid = res_search['items'][0]['id']
-            # 2. Busca as reviews reais usando o AppID
-            reviews_url = f"https://store.steampowered.com/appreviews/{appid}?json=1&language=brazilian&filter=summary&num_per_page=3"
-            res_reviews = requests.get(reviews_url).json()
-            
-            if res_reviews.get('reviews'):
-                for rev in res_reviews['reviews']:
-                    col_icon, col_txt = st.columns([1, 10])
-                    with col_icon:
-                        st.write("👍" if rev['voted_up'] else "👎")
-                    with col_txt:
-                        # Limita o tamanho do comentário para não quebrar o layout
-                        texto_review = rev['review'][:300] + "..." if len(rev['review']) > 300 else rev['review']
-                        st.markdown(f"*{texto_review}*")
-                    st.markdown("---")
-            else:
-                st.info("Ainda não há comentários brasileiros para este título na Steam.")
-        else:
-            st.warning("Jogo não localizado na base de dados da Steam.")
-    except:
-        st.error("Erro ao conectar com os servidores da Steam.")
-
-# --- 2. DESIGN SYSTEM ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Plus+Jakarta+Sans:wght@300;400;700&display=swap');
-    .stApp { background: #020205; color: #f8f9fa; font-family: 'Plus Jakarta Sans', sans-serif; }
-    .game-card {
-        background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 20px; padding: 15px; transition: all 0.3s; text-align: center; backdrop-filter: blur(10px);
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;700&display=swap');
+    .stApp { background: #0a0a0a; color: #ffffff; font-family: 'Inter', sans-serif; }
+    .vip-header {
+        background: linear-gradient(145deg, #1a1a1a, #000000);
+        padding: 50px; border-bottom: 2px solid #d4af37; text-align: center; border-radius: 0 0 50px 50px; margin-bottom: 40px;
     }
-    .game-card:hover { transform: translateY(-8px); border-color: #00f2ff; box-shadow: 0 10px 30px rgba(0, 242, 255, 0.2); }
-    .score-box { background: linear-gradient(135deg, #00f2ff, #7000ff); padding: 5px 12px; border-radius: 8px; font-weight: 800; font-family: 'Orbitron'; color: white; }
-    .company-tag { color: #00f2ff; font-size: 0.8rem; text-transform: uppercase; font-weight: 700; margin-bottom: 5px;}
+    .gold-title { font-family: 'Playfair Display', serif; color: #d4af37; font-size: 4rem; text-transform: uppercase; letter-spacing: 3px; }
+    .gallery-card { background: #161616; border: 1px solid #333; border-radius: 15px; padding: 15px; text-align: center; transition: 0.3s; }
+    .gallery-card:hover { border-color: #d4af37; transform: scale(1.02); }
+    .caption-style { color: #d4af37; font-weight: bold; margin-top: 10px; font-size: 1.1rem; }
+    .detail-section { background: rgba(255,255,255,0.03); padding: 30px; border-radius: 20px; margin-top: 40px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. LÓGICA DE NAVEGAÇÃO ---
-if 'pg' not in st.session_state: st.session_state.pg = 0
-with st.sidebar:
-    st.title("🌌 GameVault Pro")
-    busca = st.text_input("🔍 PESQUISAR JOGO")
-    ordem = st.selectbox("ORDENAR", ["Populares", "Crítica", "Lançamentos"])
-
-off = st.session_state.pg * 12
-campos = "fields name, summary, rating, aggregated_rating, first_release_date, cover.url, screenshots.url, websites.url, websites.category, involved_companies.company.name, involved_companies.developer;"
-
-if busca:
-    q = f'search "{busca}"; {campos} limit 12;'
-else:
-    sort_q = "rating desc" if ordem == "Crítica" else "first_release_date desc"
-    q = f"{campos} where rating_count > 10; sort {sort_q}; limit 12; offset {off};"
-
-jogos = query_igdb("games", q)
-
-# --- 4. MODAL COM COMENTÁRIOS DA STEAM ---
-@st.dialog("DOSSIÊ DO JOGO", width="large")
-def modal_detalhes(g):
-    nome = g.get('name')
-    st.title(f"👾 {nome}")
+# --- 2. FUNÇÃO DE CHECKOUT ATUALIZADA (R$ 20) ---
+@st.dialog("🔐 FINALIZAR PEDIDO - HELENINHA VIDEOS")
+def checkout_final(item, valor):
+    st.write(f"### Conteúdo: {item}")
+    st.write(f"## Valor Promocional: **R$ {valor}**")
+    st.divider()
     
-    c1, c2 = st.columns([1.2, 2])
-    with c1:
-        img = "https:" + g['cover']['url'].replace('t_thumb', 't_720p') if 'cover' in g else ""
-        st.image(img, use_container_width=True)
-        col_n1, col_n2 = st.columns(2)
-        col_n1.metric("PÚBLICO", f"{int(g.get('rating', 0))}%")
-        col_n2.metric("CRÍTICA", f"{int(g.get('aggregated_rating', 0))}%")
-        st.link_button("📊 REQUISITOS (Technical.City)", f"https://technical.city/pt/can-i-run-it?game={urllib.parse.quote(nome)}", use_container_width=True)
-
-    with c2:
-        empresas = [comp['company']['name'] for comp in g.get('involved_companies', []) if comp.get('developer')]
-        st.markdown(f"<div class='company-tag'>DESENVOLVEDOR: {', '.join(empresas) if empresas else 'Indie'}</div>", unsafe_allow_html=True)
-        
-        st.markdown("### 📜 RESUMO EM PORTUGUÊS")
-        with st.spinner('Traduzindo dossiê...'):
-            resumo_pt = traduzir_resumo(g.get('summary', ''))
-            st.write(resumo_pt)
-        
-        st.write(f"📅 **LANÇAMENTO:** {datetime.fromtimestamp(g.get('first_release_date', 0)).strftime('%d/%m/%Y') if g.get('first_release_date') else 'TBA'}")
-        
-        st.divider()
-        # SUBSTITUÍDO: Agora exibe comentários REAIS da Steam
-        exibir_comentarios_steam(nome)
-
-    if 'screenshots' in g:
-        st.divider()
-        st.markdown("### 📸 GALERIA DE FOTOS")
-        fotos = ["https:" + s['url'].replace('t_thumb', 't_720p') for s in g['screenshots']]
-        st.image(fotos, use_container_width=True)
-
-# --- 5. GRID ---
-if jogos:
-    cols = st.columns(4)
-    for i, j in enumerate(jogos):
-        with cols[i % 4]:
-            st.markdown('<div class="game-card">', unsafe_allow_html=True)
-            st.markdown(f"<div style='text-align:right;'><span class='score-box'>{int(j.get('rating', 0))}</span></div>", unsafe_allow_html=True)
-            capa = "https:" + j.get('cover', {}).get('url', '').replace('t_thumb', 't_cover_big') if j.get('cover') else "https://via.placeholder.com/264x352"
-            st.image(capa, use_container_width=True)
-            st.markdown(f"<p style='font-weight:bold; height:50px;'>{j.get('name')}</p>", unsafe_allow_html=True)
-            if st.button("ABRIR DOSSIÊ", key=f"id_{j['id']}", use_container_width=True):
-                modal_detalhes(j)
-            st.markdown('</div>', unsafe_allow_html=True)
-
+    st.write("💎 **PAGAMENTO VIA PIX:**")
+    st.info("Copie a chave abaixo e cole no seu banco:")
+    st.code("mariahelenadossantos339@gmail.com", language="text")
+    
     st.markdown("---")
-    b1, b2, b3 = st.columns([1,1,1])
-    if b1.button("⬅️ VOLTAR") and st.session_state.pg > 0:
-        st.session_state.pg -= 1
-        st.rerun()
-    if b3.button("MAIS ➡️"):
-        st.session_state.pg += 1
-        st.rerun()
+    st.write("🚀 **COMO RECEBER:**")
+    st.write("Após confirmar o PIX de R$ 20,00, clique no botão abaixo para me enviar o comprovante no Telegram:")
+    
+    st.link_button("✈️ ENVIAR COMPROVANTE (@Helenagbysi)", "https://t.me/Helenagbysi")
+    st.caption("Atendimento rápido para liberação do acesso.")
+
+# --- 3. HEADER PRINCIPAL ---
+st.markdown('<div class="vip-header"><h1 class="gold-title">Heleninha videos</h1><p style="color:#d4af37;">O melhor conteúdo exclusivo em alta definição</p></div>', unsafe_allow_html=True)
+
+# --- 4. GALERIA DE PRODUTOS ---
+fotos_venda = [
+    {"arq": "photo_5174912881735175080_y.jpg", "legenda": "📸 Fotos e vídeos com meu pai", "id": "btn_pai", "preco": "20,00"},
+    {"arq": "photo_5174912881735175079_y.jpg", "legenda": "📸 Fotos e vídeos com minha mãe", "id": "btn_mae", "preco": "20,00"},
+    {"arq": "photo_5174912881735175078_y.jpg", "legenda": "📸 Fotos e vídeos sozinha", "id": "btn_sozinha", "preco": "20,00"}
+]
+
+col1, col2, col3 = st.columns(3)
+colunas = [col1, col2, col3]
+
+for i, item in enumerate(fotos_venda):
+    with colunas[i]:
+        st.markdown('<div class="gallery-card">', unsafe_allow_html=True)
+        if os.path.exists(item["arq"]):
+            st.image(item["arq"], use_container_width=True)
+        else:
+            st.warning(f"Imagem {item['id']} não encontrada.")
+        
+        st.markdown(f'<p class="caption-style">{item["legenda"]}</p>', unsafe_allow_html=True)
+        st.write(f"🔥 **Apenas R$ {item['preco']}**")
+        
+        if st.button(f"LIBERAR AGORA", key=item["id"], use_container_width=True):
+            checkout_final(item["legenda"], item["preco"])
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# --- 5. DETALHES ADICIONAIS (FAQ E TERMOS) ---
+st.markdown('<div class="detail-section">', unsafe_allow_html=True)
+st.subheader("📌 Informações Importantes")
+
+col_a, col_b = st.columns(2)
+with col_a:
+    st.markdown("""
+    **Dúvidas Frequentes:**
+    * **Como recebo o conteúdo?** Imediatamente após o envio do comprovante no Telegram.
+    * **O conteúdo é vitalício?** Sim, uma vez adquirido, o acesso é seu para sempre.
+    * **Quais as formas de pagamento?** Atualmente aceitamos PIX para maior agilidade.
+    """)
+
+with col_b:
+    st.markdown("""
+    **Termos de Uso:**
+    * 🔞 Proibido para menores de 18 anos.
+    * 🚫 É estritamente proibido o compartilhamento ou revenda deste material.
+    * 🔒 Sua privacidade é nossa prioridade total.
+    """)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# --- 6. RODAPÉ ---
+st.divider()
+st.markdown(f"""
+    <div style='text-align: center; color: #555;'>
+        <p>© 2026 Heleninha videos - Todos os direitos reservados</p>
+        <p>Suporte: @Helenagbysi | mariahelenadossantos339@gmail.com</p>
+    </div>
+""", unsafe_allow_html=True)
